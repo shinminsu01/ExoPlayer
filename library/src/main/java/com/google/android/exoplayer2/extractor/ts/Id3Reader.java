@@ -75,6 +75,11 @@ public final class Id3Reader implements ElementaryStreamReader {
 
   @Override
   public void consume(ParsableByteArray data) {
+    consume(data, null);
+  }
+
+  @Override
+  public void consume(ParsableByteArray data, SyncFrame syncEvent) {
     if (!writingSample) {
       return;
     }

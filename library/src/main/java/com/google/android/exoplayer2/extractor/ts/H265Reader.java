@@ -110,6 +110,11 @@ public final class H265Reader implements ElementaryStreamReader {
 
   @Override
   public void consume(ParsableByteArray data) {
+    consume(data, null);
+  }
+
+  @Override
+  public void consume(ParsableByteArray data, SyncFrame syncEvent) {
     while (data.bytesLeft() > 0) {
       int offset = data.getPosition();
       int limit = data.limit();

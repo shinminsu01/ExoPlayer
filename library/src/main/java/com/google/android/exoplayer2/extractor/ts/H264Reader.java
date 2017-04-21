@@ -61,6 +61,8 @@ public final class H264Reader implements ElementaryStreamReader {
   // Scratch variables to avoid allocations.
   private final ParsableByteArray seiWrapper;
 
+  SyncFrame.Listener listener;
+
   /**
    * @param seiReader An SEI reader for consuming closed caption channels.
    * @param allowNonIdrKeyframes Whether to treat samples consisting of non-IDR I slices as
@@ -68,10 +70,12 @@ public final class H264Reader implements ElementaryStreamReader {
    * @param detectAccessUnits Whether to split the input stream into access units (samples) based on
    *     slice headers. Pass {@code false} if the stream contains access unit delimiters (AUDs).
    */
-  public H264Reader(SeiReader seiReader, boolean allowNonIdrKeyframes, boolean detectAccessUnits) {
+  public H264Reader(SeiReader seiReader, boolean allowNonIdrKeyframes, boolean detectAccessUnits,
+                    SyncFrame.Listener listener) {
     this.seiReader = seiReader;
     this.allowNonIdrKeyframes = allowNonIdrKeyframes;
     this.detectAccessUnits = detectAccessUnits;
+    this.listener = listener;
     prefixFlags = new boolean[3];
     sps = new NalUnitTargetBuffer(NAL_UNIT_TYPE_SPS, 128);
     pps = new NalUnitTargetBuffer(NAL_UNIT_TYPE_PPS, 128);
@@ -105,6 +109,11 @@ public final class H264Reader implements ElementaryStreamReader {
 
   @Override
   public void consume(ParsableByteArray data) {
+    consume(data, null);
+  }
+
+  @Override
+  public void consume(ParsableByteArray data, SyncFrame syncFrame) {
     int offset = data.getPosition();
     int limit = data.limit();
     byte[] dataArray = data.data;
@@ -141,8 +150,14 @@ public final class H264Reader implements ElementaryStreamReader {
           lengthToNalUnit < 0 ? -lengthToNalUnit : 0, pesTimeUs);
       // Indicate the start of the next NAL unit.
       startNalUnit(absolutePosition, nalUnitType, pesTimeUs);
+
       // Continue scanning the data.
       offset = nalUnitOffset + 3;
+
+      if (syncFrame != null && nalUnitType == 5) {
+        syncFrame.setTimeUs(pesTimeUs);
+        listener.onSyncFrameDetected(syncFrame);
+      }
     }
   }
 

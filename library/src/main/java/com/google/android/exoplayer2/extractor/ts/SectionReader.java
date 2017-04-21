@@ -58,6 +58,12 @@ public final class SectionReader implements TsPayloadReader {
 
   @Override
   public void consume(ParsableByteArray data, boolean payloadUnitStartIndicator) {
+    consume(data, payloadUnitStartIndicator, null);
+  }
+
+  @Override
+  public void consume(ParsableByteArray data, boolean payloadUnitStartIndicator,
+                      SyncFrame syncEvent) {
     int payloadStartPosition = C.POSITION_UNSET;
     if (payloadUnitStartIndicator) {
       int payloadStartOffset = data.readUnsignedByte();

@@ -49,7 +49,8 @@ public interface TsPayloadReader {
      * @return A {@link TsPayloadReader} for the packet stream carried by the provided pid.
      *     {@code null} if the stream is not supported.
      */
-    TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo);
+    TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo,
+                                        SyncFrame.Listener listener);
 
   }
 
@@ -169,5 +170,13 @@ public interface TsPayloadReader {
    * @param payloadUnitStartIndicator Whether payloadUnitStartIndicator was set on the TS packet.
    */
   void consume(ParsableByteArray data, boolean payloadUnitStartIndicator);
+
+  /**
+   * Consumes the payload of a TS packet.
+   *
+   * @param data The TS packet. The position will be set to the start of the payload.
+   * @param payloadUnitStartIndicator Whether payloadUnitStartIndicator was set on the TS packet.
+   */
+  void consume(ParsableByteArray data, boolean payloadUnitStartIndicator, SyncFrame syncEvent);
 
 }

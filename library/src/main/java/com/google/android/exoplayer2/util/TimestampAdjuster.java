@@ -105,6 +105,14 @@ public final class TimestampAdjuster {
   }
 
   /**
+   * Resets the instance to its initial state.
+   */
+  public void reset(long firstSampleTimestampUs) {
+    lastSampleTimestamp = C.TIME_UNSET;
+    this.firstSampleTimestampUs = firstSampleTimestampUs;
+  }
+
+  /**
    * Scales and offsets an MPEG-2 TS presentation timestamp considering wraparound.
    *
    * @param pts The MPEG-2 TS presentation timestamp.

@@ -82,7 +82,8 @@ public final class DefaultTsPayloadReaderFactory implements TsPayloadReader.Fact
   }
 
   @Override
-  public TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo) {
+  public TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo,
+                                             SyncFrame.Listener listener) {
     switch (streamType) {
       case TsExtractor.TS_STREAM_TYPE_MPA:
       case TsExtractor.TS_STREAM_TYPE_MPA_LSF:
@@ -101,7 +102,7 @@ public final class DefaultTsPayloadReaderFactory implements TsPayloadReader.Fact
       case TsExtractor.TS_STREAM_TYPE_H264:
         return isSet(FLAG_IGNORE_H264_STREAM) ? null
             : new PesReader(new H264Reader(buildSeiReader(esInfo),
-                isSet(FLAG_ALLOW_NON_IDR_KEYFRAMES), isSet(FLAG_DETECT_ACCESS_UNITS)));
+                isSet(FLAG_ALLOW_NON_IDR_KEYFRAMES), isSet(FLAG_DETECT_ACCESS_UNITS), listener));
       case TsExtractor.TS_STREAM_TYPE_H265:
         return new PesReader(new H265Reader(buildSeiReader(esInfo)));
       case TsExtractor.TS_STREAM_TYPE_SPLICE_INFO:

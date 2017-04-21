@@ -78,6 +78,12 @@ public final class PesReader implements TsPayloadReader {
 
   @Override
   public final void consume(ParsableByteArray data, boolean payloadUnitStartIndicator) {
+    consume(data, payloadUnitStartIndicator, null);
+  }
+
+  @Override
+  public final void consume(ParsableByteArray data, boolean payloadUnitStartIndicator,
+                            SyncFrame syncFrame) {
     if (payloadUnitStartIndicator) {
       switch (state) {
         case STATE_FINDING_HEADER:
@@ -129,7 +135,7 @@ public final class PesReader implements TsPayloadReader {
             readLength -= padding;
             data.setLimit(data.getPosition() + readLength);
           }
-          reader.consume(data);
+          reader.consume(data, syncFrame);
           if (payloadSize != -1) {
             payloadSize -= readLength;
             if (payloadSize == 0) {

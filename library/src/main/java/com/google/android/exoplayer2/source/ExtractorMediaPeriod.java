@@ -294,11 +294,17 @@ import java.io.IOException;
   @Override
   public long seekToUs(long positionUs) {
     // Treat all seeks into non-seekable media as being to t=0.
+
     positionUs = seekMap.isSeekable() ? positionUs : 0;
+
     lastSeekPositionUs = positionUs;
     int trackCount = sampleQueues.size();
+
     // If we're not pending a reset, see if we can seek within the sample queues.
-    boolean seekInsideBuffer = !isPendingReset();
+    //  boolean seekInsideBuffer = !isPendingReset();
+
+    // FIXME : always reload to support ts seek
+    boolean seekInsideBuffer = false;
     for (int i = 0; seekInsideBuffer && i < trackCount; i++) {
       if (trackEnabledStates[i]) {
         seekInsideBuffer = sampleQueues.valueAt(i).skipToKeyframeBefore(positionUs);
@@ -347,13 +353,13 @@ import java.io.IOException;
       long loadDurationMs) {
     copyLengthFromLoader(loadable);
     loadingFinished = true;
-    if (durationUs == C.TIME_UNSET) {
+//    if (durationUs == C.TIME_UNSET) {
       long largestQueuedTimestampUs = getLargestQueuedTimestampUs();
       durationUs = largestQueuedTimestampUs == Long.MIN_VALUE ? 0
           : largestQueuedTimestampUs + DEFAULT_LAST_SAMPLE_DURATION_US;
       sourceListener.onSourceInfoRefreshed(
           new SinglePeriodTimeline(durationUs, seekMap.isSeekable()), null);
-    }
+//    }
     callback.onContinueLoadingRequested(this);
   }
 

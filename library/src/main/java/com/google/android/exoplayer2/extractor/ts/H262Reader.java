@@ -94,6 +94,11 @@ public final class H262Reader implements ElementaryStreamReader {
 
   @Override
   public void consume(ParsableByteArray data) {
+    consume(data, null);
+  }
+
+  @Override
+  public void consume(ParsableByteArray data, SyncFrame syncEvent) {
     int offset = data.getPosition();
     int limit = data.limit();
     byte[] dataArray = data.data;

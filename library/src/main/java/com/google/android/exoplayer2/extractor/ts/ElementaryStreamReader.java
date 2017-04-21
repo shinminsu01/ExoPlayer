@@ -54,6 +54,13 @@ public interface ElementaryStreamReader {
   void consume(ParsableByteArray data);
 
   /**
+   * Consumes (possibly partial) data from the current packet.
+   *
+   * @param data The data to consume.
+   */
+  void consume(ParsableByteArray data, SyncFrame syncEvent);
+
+  /**
    * Called when a packet ends.
    */
   void packetFinished();

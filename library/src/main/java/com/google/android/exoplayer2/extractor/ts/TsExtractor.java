@@ -45,7 +45,7 @@ import java.util.List;
 /**
  * Facilitates the extraction of data from the MPEG-2 TS container format.
  */
-public final class TsExtractor implements Extractor {
+public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener {
 
   /**
    * Factory for {@link TsExtractor} instances.
@@ -97,6 +97,7 @@ public final class TsExtractor implements Extractor {
   private static final int TS_SYNC_BYTE = 0x47; // First byte of each TS packet.
   private static final int TS_PAT_PID = 0;
   private static final int MAX_PID_PLUS_ONE = 0x2000;
+  private static final int SAMPLE_SYNC_FRAME_SIZE = 2;
 
   private static final long AC3_FORMAT_IDENTIFIER = Util.getIntegerCodeForString("AC-3");
   private static final long E_AC3_FORMAT_IDENTIFIER = Util.getIntegerCodeForString("EAC3");
@@ -113,12 +114,17 @@ public final class TsExtractor implements Extractor {
   private final TsPayloadReader.Factory payloadReaderFactory;
   private final SparseArray<TsPayloadReader> tsPayloadReaders; // Indexed by pid
   private final SparseBooleanArray trackIds;
+  private final ArrayList<SyncFrame> syncPoints;
 
   // Accessed only by the loading thread.
   private ExtractorOutput output;
   private int remainingPmts;
   private boolean tracksEnded;
   private TsPayloadReader id3Reader;
+
+  // To support seek
+  private long durationUs = C.TIME_UNSET;
+  private long inputStreamPosition = 0;
 
   public TsExtractor() {
     this(MODE_NORMAL, new TimestampAdjuster(0), new DefaultTsPayloadReaderFactory());
@@ -145,6 +151,7 @@ public final class TsExtractor implements Extractor {
     trackIds = new SparseBooleanArray();
     tsPayloadReaders = new SparseArray<>();
     continuityCounters = new SparseIntArray();
+    syncPoints = new ArrayList<>();
     resetPayloadReaders();
   }
 
@@ -171,14 +178,13 @@ public final class TsExtractor implements Extractor {
   @Override
   public void init(ExtractorOutput output) {
     this.output = output;
-    output.seekMap(new SeekMap.Unseekable(C.TIME_UNSET));
   }
 
   @Override
   public void seek(long position, long timeUs) {
     int timestampAdjustersCount = timestampAdjusters.size();
     for (int i = 0; i < timestampAdjustersCount; i++) {
-      timestampAdjusters.get(i).reset();
+      timestampAdjusters.get(i).reset(getSeekTimeUs(timeUs));
     }
     tsPacketBuffer.reset();
     continuityCounters.clear();
@@ -203,6 +209,7 @@ public final class TsExtractor implements Extractor {
       }
       tsPacketBuffer.reset(data, bytesLeft);
     }
+
     // Read more bytes until there is at least one packet size
     while (tsPacketBuffer.bytesLeft() < TS_PACKET_SIZE) {
       int limit = tsPacketBuffer.limit();
@@ -272,17 +279,96 @@ public final class TsExtractor implements Extractor {
           payloadReader.seek();
         }
         tsPacketBuffer.setLimit(endOfPacket);
-        payloadReader.consume(tsPacketBuffer, payloadUnitStartIndicator);
+        payloadReader.consume(tsPacketBuffer, payloadUnitStartIndicator, new SyncFrame(0, inputStreamPosition));
+
         Assertions.checkState(tsPacketBuffer.getPosition() <= endOfPacket);
         tsPacketBuffer.setLimit(limit);
       }
     }
 
+    inputStreamPosition += TS_PACKET_SIZE;
     tsPacketBuffer.setPosition(endOfPacket);
+
+    // Estimate duration - can be inaccurate
+    if (durationUs == C.TIME_UNSET && syncPoints.size() > SAMPLE_SYNC_FRAME_SIZE) {
+      int sampleIndex = 1;
+      long diffUs = syncPoints.get(sampleIndex).getTimeUs() - syncPoints.get(sampleIndex-1).getTimeUs();
+      long diffOffset = syncPoints.get(sampleIndex).getOffset() - syncPoints.get(sampleIndex-1).getOffset();
+      durationUs = input.getLength() * diffUs / diffOffset;
+      output.seekMap(this);
+    }
+
     return RESULT_CONTINUE;
   }
 
+  // SyncFrame.Listener
+  @Override
+  public void onSyncFrameDetected(SyncFrame syncFrame) {
+    if (!syncPoints.isEmpty()) {
+      SyncFrame lastSyncFrame = syncPoints.get(syncPoints.size()-1);
+      if (lastSyncFrame.getTimeUs() < syncFrame.getTimeUs()) {
+        syncPoints.add(syncFrame);
+      }
+    } else {
+      syncPoints.add(syncFrame);
+    }
+  }
+
+  // SeekMap implementation.
+
+  @Override
+  public boolean isSeekable() {
+    return true;
+  }
+
+  @Override
+  public long getDurationUs() {
+    return durationUs;
+  }
+
+  @Override
+  public long getPosition(long timeUs) {
+    long position = 0;
+
+    if (timeUs == 0)
+      return position;
+
+    SyncFrame lastFrame = syncPoints.get(syncPoints.size() - 1);
+    if (timeUs < lastFrame.getTimeUs()) {
+      position = syncPoints.get(0).getOffset();
+      for (SyncFrame f : syncPoints) {
+        if (f.getTimeUs() > timeUs)
+          break;
+        position = f.getOffset();
+      }
+    } else {
+      position = lastFrame.getOffset();
+    }
+    inputStreamPosition = position;
+    return position;
+  }
+
   // Internals.
+
+  private long getSeekTimeUs(long timeUs) {
+    long seekTimeUs = 0;
+
+    if (timeUs == 0)
+      return seekTimeUs;
+
+    SyncFrame lastFrame = syncPoints.get(syncPoints.size() - 1);
+    if (timeUs < lastFrame.getTimeUs()) {
+      seekTimeUs = syncPoints.get(0).getTimeUs();
+      for (SyncFrame f : syncPoints) {
+        if (f.getTimeUs() > timeUs)
+          break;
+        seekTimeUs = f.getTimeUs();
+      }
+    } else {
+      seekTimeUs = lastFrame.getTimeUs();
+    }
+    return seekTimeUs;
+  }
 
   private void resetPayloadReaders() {
     trackIds.clear();
@@ -407,7 +493,7 @@ public final class TsExtractor implements Extractor {
         // Setup an ID3 track regardless of whether there's a corresponding entry, in case one
         // appears intermittently during playback. See [Internal: b/20261500].
         EsInfo dummyEsInfo = new EsInfo(TS_STREAM_TYPE_ID3, null, new byte[0]);
-        id3Reader = payloadReaderFactory.createPayloadReader(TS_STREAM_TYPE_ID3, dummyEsInfo);
+        id3Reader = payloadReaderFactory.createPayloadReader(TS_STREAM_TYPE_ID3, dummyEsInfo, null);
         id3Reader.init(timestampAdjuster, output,
             new TrackIdGenerator(programNumber, TS_STREAM_TYPE_ID3, MAX_PID_PLUS_ONE));
       }
@@ -436,7 +522,7 @@ public final class TsExtractor implements Extractor {
         if (mode == MODE_HLS && streamType == TS_STREAM_TYPE_ID3) {
           reader = id3Reader;
         } else {
-          reader = payloadReaderFactory.createPayloadReader(streamType, esInfo);
+          reader = payloadReaderFactory.createPayloadReader(streamType, esInfo, TsExtractor.this);
           if (reader != null) {
             reader.init(timestampAdjuster, output,
                 new TrackIdGenerator(programNumber, trackId, MAX_PID_PLUS_ONE));
