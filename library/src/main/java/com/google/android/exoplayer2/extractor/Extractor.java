@@ -63,6 +63,13 @@ public interface Extractor {
   void init(ExtractorOutput output);
 
   /**
+   * Initializes the extractor with an {@link ExtractorOutput}. Called at most once.
+   *
+   * @param output An {@link ExtractorOutput} to receive extracted data.
+   */
+  void init(ExtractorOutput output, ExtractorMetaData metaData);
+
+  /**
    * Extracts data read from a provided {@link ExtractorInput}.
    * <p>
    * A single call to this method will block until some progress has been made, but will not block

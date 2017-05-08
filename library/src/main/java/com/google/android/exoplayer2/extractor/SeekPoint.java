@@ -1,19 +1,21 @@
-package com.google.android.exoplayer2.extractor.ts;
+package com.google.android.exoplayer2.extractor;
+
+import java.io.Serializable;
 
 /**
- * Created by shinms on 17. 4. 4.
+ * Created by shinms on 17. 4. 27.
  */
 
-public class SyncFrame {
+public class SeekPoint implements Serializable {
 
-    interface Listener {
-        void onSyncFrameDetected(SyncFrame syncFrame);
+    public interface EventListener {
+        void onSeekPointDetected(SeekPoint seekPoint);
     }
 
     private long timeUs;
     private long offset;
 
-    public SyncFrame(long timeUs, long offset) {
+    public SeekPoint(long timeUs, long offset) {
         this.timeUs = timeUs;
         this.offset = offset;
     }
@@ -32,5 +34,9 @@ public class SyncFrame {
 
     public long getOffset() {
         return offset;
+    }
+
+    public String toString(){
+        return "time:" + timeUs + ", offset:" + offset;
     }
 }

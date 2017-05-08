@@ -27,6 +27,7 @@ import com.google.android.exoplayer2.extractor.DefaultTrackOutput;
 import com.google.android.exoplayer2.extractor.DefaultTrackOutput.UpstreamFormatChangedListener;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
+import com.google.android.exoplayer2.extractor.ExtractorMetaData;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.extractor.SeekMap;
@@ -64,6 +65,7 @@ import java.io.IOException;
   private final MediaSource.Listener sourceListener;
   private final Allocator allocator;
   private final String customCacheKey;
+  private final ExtractorMetaData extractorMetaData;
   private final Loader loader;
   private final ExtractorHolder extractorHolder;
   private final ConditionVariable loadCondition;
@@ -109,7 +111,7 @@ import java.io.IOException;
   public ExtractorMediaPeriod(Uri uri, DataSource dataSource, Extractor[] extractors,
       int minLoadableRetryCount, Handler eventHandler,
       ExtractorMediaSource.EventListener eventListener, MediaSource.Listener sourceListener,
-      Allocator allocator, String customCacheKey) {
+      Allocator allocator, String customCacheKey, ExtractorMetaData extractorMetaData) {
     this.uri = uri;
     this.dataSource = dataSource;
     this.minLoadableRetryCount = minLoadableRetryCount;
@@ -118,8 +120,9 @@ import java.io.IOException;
     this.sourceListener = sourceListener;
     this.allocator = allocator;
     this.customCacheKey = customCacheKey;
+    this.extractorMetaData = extractorMetaData;
     loader = new Loader("Loader:ExtractorMediaPeriod");
-    extractorHolder = new ExtractorHolder(extractors, this);
+    extractorHolder = new ExtractorHolder(extractors, this, extractorMetaData);
     loadCondition = new ConditionVariable();
     maybeFinishPrepareRunnable = new Runnable() {
       @Override
@@ -353,13 +356,13 @@ import java.io.IOException;
       long loadDurationMs) {
     copyLengthFromLoader(loadable);
     loadingFinished = true;
-//    if (durationUs == C.TIME_UNSET) {
+    if (durationUs == C.TIME_UNSET) {
       long largestQueuedTimestampUs = getLargestQueuedTimestampUs();
       durationUs = largestQueuedTimestampUs == Long.MIN_VALUE ? 0
           : largestQueuedTimestampUs + DEFAULT_LAST_SAMPLE_DURATION_US;
       sourceListener.onSourceInfoRefreshed(
           new SinglePeriodTimeline(durationUs, seekMap.isSeekable()), null);
-//    }
+    }
     callback.onContinueLoadingRequested(this);
   }
 
@@ -673,6 +676,7 @@ import java.io.IOException;
 
     private final Extractor[] extractors;
     private final ExtractorOutput extractorOutput;
+    private final ExtractorMetaData extractorMetaData;
     private Extractor extractor;
 
     /**
@@ -681,9 +685,11 @@ import java.io.IOException;
      * @param extractors One or more extractors to choose from.
      * @param extractorOutput The output that will be used to initialize the selected extractor.
      */
-    public ExtractorHolder(Extractor[] extractors, ExtractorOutput extractorOutput) {
+    public ExtractorHolder(Extractor[] extractors, ExtractorOutput extractorOutput,
+                           ExtractorMetaData extractorMetaData) {
       this.extractors = extractors;
       this.extractorOutput = extractorOutput;
+      this.extractorMetaData = extractorMetaData;
     }
 
     /**
@@ -718,7 +724,7 @@ import java.io.IOException;
         throw new UnrecognizedInputFormatException("None of the available extractors ("
             + Util.getCommaDelimitedSimpleClassNames(extractors) + ") could read the stream.", uri);
       }
-      extractor.init(extractorOutput);
+      extractor.init(extractorOutput, extractorMetaData);
       return extractor;
     }
 

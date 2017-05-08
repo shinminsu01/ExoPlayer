@@ -1,5 +1,14 @@
 [
   {
+    "name": "TS Test",
+    "samples": [
+      {
+        "name": "Test Stream",
+        "uri": "file:///storage/emulated/0/Movies/TestStream.ts"
+      }
+    ]
+  },
+  {
     "name": "YouTube DASH",
     "samples": [
       {

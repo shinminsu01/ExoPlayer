@@ -43,6 +43,8 @@ import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
 import com.google.android.exoplayer2.drm.HttpMediaDrmCallback;
 import com.google.android.exoplayer2.drm.UnsupportedDrmException;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
+import com.google.android.exoplayer2.extractor.ExtractorMetaData;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderInitializationException;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer2.source.BehindLiveWindowException;
@@ -67,9 +69,14 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
 import com.google.android.exoplayer2.util.Util;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -329,11 +336,26 @@ public class PlayerActivity extends Activity implements OnClickListener, ExoPlay
         return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler, eventLogger);
       case C.TYPE_OTHER:
         return new ExtractorMediaSource(uri, mediaDataSourceFactory, new DefaultExtractorsFactory(),
-            mainHandler, eventLogger);
+            mainHandler, eventLogger, getExtractorMetaData(uri));
       default: {
         throw new IllegalStateException("Unsupported type: " + type);
       }
     }
+  }
+
+  private ExtractorMetaData getExtractorMetaData(Uri uri) {
+    ExtractorMetaData metaData = new ExtractorMetaData();
+    ObjectInputStream ois = null;
+    try {
+      ois = new ObjectInputStream(new FileInputStream(
+              uri.toString().replace("file://", "").replace(".ts", ".dat")));
+      metaData = (ExtractorMetaData) ois.readObject();
+      ois.close();
+    } catch (IOException | ClassNotFoundException e) {
+      e.printStackTrace();
+      return null;
+    }
+    return metaData;
   }
 
   private DrmSessionManager<FrameworkMediaCrypto> buildDrmSessionManager(UUID uuid,

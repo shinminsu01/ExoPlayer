@@ -22,6 +22,7 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.extractor.Extractor;
+import com.google.android.exoplayer2.extractor.ExtractorMetaData;
 import com.google.android.exoplayer2.extractor.ExtractorsFactory;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.DataSource;
@@ -80,6 +81,7 @@ public final class ExtractorMediaSource implements MediaSource, MediaSource.List
   private final EventListener eventListener;
   private final Timeline.Period period;
   private final String customCacheKey;
+  private final ExtractorMetaData extractorMetaData;
 
   private MediaSource.Listener sourceListener;
   private Timeline timeline;
@@ -97,7 +99,23 @@ public final class ExtractorMediaSource implements MediaSource, MediaSource.List
   public ExtractorMediaSource(Uri uri, DataSource.Factory dataSourceFactory,
       ExtractorsFactory extractorsFactory, Handler eventHandler, EventListener eventListener) {
     this(uri, dataSourceFactory, extractorsFactory, MIN_RETRY_COUNT_DEFAULT_FOR_MEDIA, eventHandler,
-        eventListener, null);
+        eventListener, null, null);
+  }
+
+  /**
+   * @param uri The {@link Uri} of the media stream.
+   * @param dataSourceFactory A factory for {@link DataSource}s to read the media.
+   * @param extractorsFactory A factory for {@link Extractor}s to process the media stream. If the
+   *     possible formats are known, pass a factory that instantiates extractors for those formats.
+   *     Otherwise, pass a {@link DefaultExtractorsFactory} to use default extractors.
+   * @param eventHandler A handler for events. May be null if delivery of events is not required.
+   * @param eventListener A listener of events. May be null if delivery of events is not required.
+   */
+  public ExtractorMediaSource(Uri uri, DataSource.Factory dataSourceFactory,
+                              ExtractorsFactory extractorsFactory, Handler eventHandler,
+                              EventListener eventListener, ExtractorMetaData extractorMetaData) {
+    this(uri, dataSourceFactory, extractorsFactory, MIN_RETRY_COUNT_DEFAULT_FOR_MEDIA, eventHandler,
+            eventListener, null, extractorMetaData);
   }
 
   /**
@@ -115,7 +133,7 @@ public final class ExtractorMediaSource implements MediaSource, MediaSource.List
       ExtractorsFactory extractorsFactory, Handler eventHandler, EventListener eventListener,
       String customCacheKey) {
     this(uri, dataSourceFactory, extractorsFactory, MIN_RETRY_COUNT_DEFAULT_FOR_MEDIA, eventHandler,
-        eventListener, customCacheKey);
+        eventListener, customCacheKey, null);
   }
 
   /**
@@ -132,7 +150,7 @@ public final class ExtractorMediaSource implements MediaSource, MediaSource.List
    */
   public ExtractorMediaSource(Uri uri, DataSource.Factory dataSourceFactory,
       ExtractorsFactory extractorsFactory, int minLoadableRetryCount, Handler eventHandler,
-      EventListener eventListener, String customCacheKey) {
+      EventListener eventListener, String customCacheKey, ExtractorMetaData extractorMetaData) {
     this.uri = uri;
     this.dataSourceFactory = dataSourceFactory;
     this.extractorsFactory = extractorsFactory;
@@ -140,6 +158,7 @@ public final class ExtractorMediaSource implements MediaSource, MediaSource.List
     this.eventHandler = eventHandler;
     this.eventListener = eventListener;
     this.customCacheKey = customCacheKey;
+    this.extractorMetaData = extractorMetaData;
     period = new Timeline.Period();
   }
 
@@ -160,7 +179,7 @@ public final class ExtractorMediaSource implements MediaSource, MediaSource.List
     Assertions.checkArgument(index == 0);
     return new ExtractorMediaPeriod(uri, dataSourceFactory.createDataSource(),
         extractorsFactory.createExtractors(), minLoadableRetryCount, eventHandler, eventListener,
-        this, allocator, customCacheKey);
+        this, allocator, customCacheKey, extractorMetaData);
   }
 
   @Override

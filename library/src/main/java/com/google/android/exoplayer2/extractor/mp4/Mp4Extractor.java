@@ -21,6 +21,7 @@ import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
+import com.google.android.exoplayer2.extractor.ExtractorMetaData;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.ExtractorsFactory;
 import com.google.android.exoplayer2.extractor.GaplessInfoHolder;
@@ -112,6 +113,11 @@ public final class Mp4Extractor implements Extractor, SeekMap {
 
   @Override
   public void init(ExtractorOutput output) {
+    init(output, null);
+  }
+
+  @Override
+  public void init(ExtractorOutput output, ExtractorMetaData metaData) {
     extractorOutput = output;
   }
 

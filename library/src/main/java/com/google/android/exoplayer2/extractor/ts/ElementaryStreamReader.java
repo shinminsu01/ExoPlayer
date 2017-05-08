@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2.extractor.ts;
 
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 
@@ -58,7 +59,7 @@ public interface ElementaryStreamReader {
    *
    * @param data The data to consume.
    */
-  void consume(ParsableByteArray data, SyncFrame syncEvent);
+  void consume(ParsableByteArray data, SeekPoint seekPoint);
 
   /**
    * Called when a packet ends.

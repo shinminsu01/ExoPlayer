@@ -18,6 +18,7 @@ package com.google.android.exoplayer2.extractor.ts;
 import android.support.annotation.IntDef;
 import android.util.SparseArray;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.EsInfo;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.ParsableByteArray;
@@ -83,7 +84,7 @@ public final class DefaultTsPayloadReaderFactory implements TsPayloadReader.Fact
 
   @Override
   public TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo,
-                                             SyncFrame.Listener listener) {
+                                             SeekPoint.EventListener seekPointEventListener) {
     switch (streamType) {
       case TsExtractor.TS_STREAM_TYPE_MPA:
       case TsExtractor.TS_STREAM_TYPE_MPA_LSF:
@@ -102,7 +103,8 @@ public final class DefaultTsPayloadReaderFactory implements TsPayloadReader.Fact
       case TsExtractor.TS_STREAM_TYPE_H264:
         return isSet(FLAG_IGNORE_H264_STREAM) ? null
             : new PesReader(new H264Reader(buildSeiReader(esInfo),
-                isSet(FLAG_ALLOW_NON_IDR_KEYFRAMES), isSet(FLAG_DETECT_ACCESS_UNITS), listener));
+                isSet(FLAG_ALLOW_NON_IDR_KEYFRAMES), isSet(FLAG_DETECT_ACCESS_UNITS),
+                seekPointEventListener));
       case TsExtractor.TS_STREAM_TYPE_H265:
         return new PesReader(new H265Reader(buildSeiReader(esInfo)));
       case TsExtractor.TS_STREAM_TYPE_SPLICE_INFO:

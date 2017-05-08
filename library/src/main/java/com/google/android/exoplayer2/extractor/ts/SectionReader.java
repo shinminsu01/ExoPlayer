@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.extractor.ts;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import com.google.android.exoplayer2.util.Util;
@@ -63,7 +64,7 @@ public final class SectionReader implements TsPayloadReader {
 
   @Override
   public void consume(ParsableByteArray data, boolean payloadUnitStartIndicator,
-                      SyncFrame syncEvent) {
+                      SeekPoint seekPoint) {
     int payloadStartPosition = C.POSITION_UNSET;
     if (payloadUnitStartIndicator) {
       int payloadStartOffset = data.readUnsignedByte();

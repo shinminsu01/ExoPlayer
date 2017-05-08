@@ -20,6 +20,7 @@ import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
+import com.google.android.exoplayer2.extractor.ExtractorMetaData;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.extractor.SeekMap;
@@ -64,6 +65,11 @@ public final class RawCcExtractor implements Extractor {
 
   @Override
   public void init(ExtractorOutput output) {
+    init(output, null);
+  }
+
+  @Override
+  public void init(ExtractorOutput output, ExtractorMetaData metaData) {
     output.seekMap(new SeekMap.Unseekable(C.TIME_UNSET));
     trackOutput = output.track(0, C.TRACK_TYPE_TEXT);
     output.endTracks();

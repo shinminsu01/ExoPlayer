@@ -18,6 +18,8 @@ package com.google.android.exoplayer2.extractor.ts;
 import android.util.Log;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
+import com.google.android.exoplayer2.extractor.SeekMap;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.util.ParsableBitArray;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
@@ -83,7 +85,7 @@ public final class PesReader implements TsPayloadReader {
 
   @Override
   public final void consume(ParsableByteArray data, boolean payloadUnitStartIndicator,
-                            SyncFrame syncFrame) {
+                            SeekPoint seekPoint) {
     if (payloadUnitStartIndicator) {
       switch (state) {
         case STATE_FINDING_HEADER:
@@ -135,7 +137,7 @@ public final class PesReader implements TsPayloadReader {
             readLength -= padding;
             data.setLimit(data.getPosition() + readLength);
           }
-          reader.consume(data, syncFrame);
+          reader.consume(data, seekPoint);
           if (payloadSize != -1) {
             payloadSize -= readLength;
             if (payloadSize == 0) {

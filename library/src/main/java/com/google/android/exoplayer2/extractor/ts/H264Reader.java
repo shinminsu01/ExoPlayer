@@ -19,6 +19,7 @@ import android.util.SparseArray;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.TrackIdGenerator;
 import com.google.android.exoplayer2.util.MimeTypes;
@@ -61,7 +62,8 @@ public final class H264Reader implements ElementaryStreamReader {
   // Scratch variables to avoid allocations.
   private final ParsableByteArray seiWrapper;
 
-  SyncFrame.Listener listener;
+  // Seek point event listener
+  private SeekPoint.EventListener seekPointEventListener;
 
   /**
    * @param seiReader An SEI reader for consuming closed caption channels.
@@ -71,11 +73,11 @@ public final class H264Reader implements ElementaryStreamReader {
    *     slice headers. Pass {@code false} if the stream contains access unit delimiters (AUDs).
    */
   public H264Reader(SeiReader seiReader, boolean allowNonIdrKeyframes, boolean detectAccessUnits,
-                    SyncFrame.Listener listener) {
+                    SeekPoint.EventListener seekPointEventListener) {
     this.seiReader = seiReader;
     this.allowNonIdrKeyframes = allowNonIdrKeyframes;
     this.detectAccessUnits = detectAccessUnits;
-    this.listener = listener;
+    this.seekPointEventListener = seekPointEventListener;
     prefixFlags = new boolean[3];
     sps = new NalUnitTargetBuffer(NAL_UNIT_TYPE_SPS, 128);
     pps = new NalUnitTargetBuffer(NAL_UNIT_TYPE_PPS, 128);
@@ -113,7 +115,7 @@ public final class H264Reader implements ElementaryStreamReader {
   }
 
   @Override
-  public void consume(ParsableByteArray data, SyncFrame syncFrame) {
+  public void consume(ParsableByteArray data, SeekPoint seekPoint) {
     int offset = data.getPosition();
     int limit = data.limit();
     byte[] dataArray = data.data;
@@ -154,9 +156,8 @@ public final class H264Reader implements ElementaryStreamReader {
       // Continue scanning the data.
       offset = nalUnitOffset + 3;
 
-      if (syncFrame != null && nalUnitType == 5) {
-        syncFrame.setTimeUs(pesTimeUs);
-        listener.onSyncFrameDetected(syncFrame);
+      if (nalUnitType == 5) {
+        notifySeekPoint(seekPoint);
       }
     }
   }
@@ -164,6 +165,13 @@ public final class H264Reader implements ElementaryStreamReader {
   @Override
   public void packetFinished() {
     // Do nothing.
+  }
+
+  private void notifySeekPoint(SeekPoint seekPoint) {
+    if (seekPointEventListener != null && seekPoint != null) {
+      seekPoint.setTimeUs(pesTimeUs);
+      seekPointEventListener.onSeekPointDetected(seekPoint);
+    }
   }
 
   private void startNalUnit(long position, int nalUnitType, long pesTimeUs) {

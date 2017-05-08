@@ -22,10 +22,12 @@ import android.util.SparseIntArray;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
+import com.google.android.exoplayer2.extractor.ExtractorMetaData;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.ExtractorsFactory;
 import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.extractor.SeekMap;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.EsInfo;
 import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.TrackIdGenerator;
@@ -45,7 +47,7 @@ import java.util.List;
 /**
  * Facilitates the extraction of data from the MPEG-2 TS container format.
  */
-public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener {
+public final class TsExtractor implements Extractor, SeekMap, SeekPoint.EventListener {
 
   /**
    * Factory for {@link TsExtractor} instances.
@@ -114,7 +116,6 @@ public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener
   private final TsPayloadReader.Factory payloadReaderFactory;
   private final SparseArray<TsPayloadReader> tsPayloadReaders; // Indexed by pid
   private final SparseBooleanArray trackIds;
-  private final ArrayList<SyncFrame> syncPoints;
 
   // Accessed only by the loading thread.
   private ExtractorOutput output;
@@ -123,8 +124,10 @@ public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener
   private TsPayloadReader id3Reader;
 
   // To support seek
-  private long durationUs = C.TIME_UNSET;
-  private long inputStreamPosition = 0;
+  private long durationUs;
+  private boolean useExternalMetaData;
+  private List<SeekPoint> seekPoints;
+  private long inputStreamPosition;
 
   public TsExtractor() {
     this(MODE_NORMAL, new TimestampAdjuster(0), new DefaultTsPayloadReaderFactory());
@@ -151,8 +154,8 @@ public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener
     trackIds = new SparseBooleanArray();
     tsPayloadReaders = new SparseArray<>();
     continuityCounters = new SparseIntArray();
-    syncPoints = new ArrayList<>();
     resetPayloadReaders();
+    inputStreamPosition = 0;
   }
 
   // Extractor implementation.
@@ -178,6 +181,24 @@ public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener
   @Override
   public void init(ExtractorOutput output) {
     this.output = output;
+    this.durationUs = C.TIME_UNSET;
+    this.seekPoints = new ArrayList<>();
+    this.useExternalMetaData = false;
+  }
+
+  @Override
+  public void init(ExtractorOutput output, ExtractorMetaData metaData) {
+    this.output = output;
+    if (metaData != null) {
+      this.durationUs = metaData.getDuration();
+      this.seekPoints = metaData.getSeekPoints();
+      this.useExternalMetaData = true;
+      output.seekMap(this);
+    } else {
+      this.durationUs = C.TIME_UNSET;
+      this.seekPoints = new ArrayList<>();
+      this.useExternalMetaData = false;
+    }
   }
 
   @Override
@@ -279,7 +300,7 @@ public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener
           payloadReader.seek();
         }
         tsPacketBuffer.setLimit(endOfPacket);
-        payloadReader.consume(tsPacketBuffer, payloadUnitStartIndicator, new SyncFrame(0, inputStreamPosition));
+        payloadReader.consume(tsPacketBuffer, payloadUnitStartIndicator, new SeekPoint(0, inputStreamPosition));
 
         Assertions.checkState(tsPacketBuffer.getPosition() <= endOfPacket);
         tsPacketBuffer.setLimit(limit);
@@ -290,28 +311,15 @@ public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener
     tsPacketBuffer.setPosition(endOfPacket);
 
     // Estimate duration - can be inaccurate
-    if (durationUs == C.TIME_UNSET && syncPoints.size() > SAMPLE_SYNC_FRAME_SIZE) {
+    if (durationUs == C.TIME_UNSET && seekPoints.size() > SAMPLE_SYNC_FRAME_SIZE) {
       int sampleIndex = 1;
-      long diffUs = syncPoints.get(sampleIndex).getTimeUs() - syncPoints.get(sampleIndex-1).getTimeUs();
-      long diffOffset = syncPoints.get(sampleIndex).getOffset() - syncPoints.get(sampleIndex-1).getOffset();
+      long diffUs = seekPoints.get(sampleIndex).getTimeUs() - seekPoints.get(sampleIndex-1).getTimeUs();
+      long diffOffset = seekPoints.get(sampleIndex).getOffset() - seekPoints.get(sampleIndex-1).getOffset();
       durationUs = input.getLength() * diffUs / diffOffset;
       output.seekMap(this);
     }
 
     return RESULT_CONTINUE;
-  }
-
-  // SyncFrame.Listener
-  @Override
-  public void onSyncFrameDetected(SyncFrame syncFrame) {
-    if (!syncPoints.isEmpty()) {
-      SyncFrame lastSyncFrame = syncPoints.get(syncPoints.size()-1);
-      if (lastSyncFrame.getTimeUs() < syncFrame.getTimeUs()) {
-        syncPoints.add(syncFrame);
-      }
-    } else {
-      syncPoints.add(syncFrame);
-    }
   }
 
   // SeekMap implementation.
@@ -333,19 +341,33 @@ public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener
     if (timeUs == 0)
       return position;
 
-    SyncFrame lastFrame = syncPoints.get(syncPoints.size() - 1);
-    if (timeUs < lastFrame.getTimeUs()) {
-      position = syncPoints.get(0).getOffset();
-      for (SyncFrame f : syncPoints) {
-        if (f.getTimeUs() > timeUs)
+    SeekPoint last = seekPoints.get(seekPoints.size() - 1);
+    if (timeUs < last.getTimeUs()) {
+      position = seekPoints.get(0).getOffset();
+      for (SeekPoint point : seekPoints) {
+        if (point.getTimeUs() > timeUs)
           break;
-        position = f.getOffset();
+        position = point.getOffset();
       }
     } else {
-      position = lastFrame.getOffset();
+      position = last.getOffset();
     }
     inputStreamPosition = position;
     return position;
+  }
+
+  @Override
+  public void onSeekPointDetected(SeekPoint seekPoint) {
+    if (!useExternalMetaData) {
+      if (!seekPoints.isEmpty()) {
+        SeekPoint last = seekPoints.get(seekPoints.size() - 1);
+        if (last.getTimeUs() < seekPoint.getTimeUs()) {
+          seekPoints.add(seekPoint);
+        }
+      } else {
+        seekPoints.add(seekPoint);
+      }
+    }
   }
 
   // Internals.
@@ -356,10 +378,10 @@ public final class TsExtractor implements Extractor, SeekMap, SyncFrame.Listener
     if (timeUs == 0)
       return seekTimeUs;
 
-    SyncFrame lastFrame = syncPoints.get(syncPoints.size() - 1);
+    SeekPoint lastFrame = seekPoints.get(seekPoints.size() - 1);
     if (timeUs < lastFrame.getTimeUs()) {
-      seekTimeUs = syncPoints.get(0).getTimeUs();
-      for (SyncFrame f : syncPoints) {
+      seekTimeUs = seekPoints.get(0).getTimeUs();
+      for (SeekPoint f : seekPoints) {
         if (f.getTimeUs() > timeUs)
           break;
         seekTimeUs = f.getTimeUs();

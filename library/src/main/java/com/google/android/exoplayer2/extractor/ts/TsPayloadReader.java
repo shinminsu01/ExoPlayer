@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.extractor.ts;
 
 import android.util.SparseArray;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
@@ -50,7 +51,7 @@ public interface TsPayloadReader {
      *     {@code null} if the stream is not supported.
      */
     TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo,
-                                        SyncFrame.Listener listener);
+                                        SeekPoint.EventListener seekPointEventListener);
 
   }
 
@@ -177,6 +178,6 @@ public interface TsPayloadReader {
    * @param data The TS packet. The position will be set to the start of the payload.
    * @param payloadUnitStartIndicator Whether payloadUnitStartIndicator was set on the TS packet.
    */
-  void consume(ParsableByteArray data, boolean payloadUnitStartIndicator, SyncFrame syncEvent);
+  void consume(ParsableByteArray data, boolean payloadUnitStartIndicator, SeekPoint seekPoint);
 
 }

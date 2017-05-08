@@ -19,6 +19,7 @@ import android.util.Log;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
+import com.google.android.exoplayer2.extractor.SeekPoint;
 import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.TrackIdGenerator;
 import com.google.android.exoplayer2.util.MimeTypes;
@@ -114,7 +115,7 @@ public final class H265Reader implements ElementaryStreamReader {
   }
 
   @Override
-  public void consume(ParsableByteArray data, SyncFrame syncEvent) {
+  public void consume(ParsableByteArray data, SeekPoint seekPoint) {
     while (data.bytesLeft() > 0) {
       int offset = data.getPosition();
       int limit = data.limit();
