@@ -337,6 +337,9 @@ public class PlayerActivity extends Activity implements OnClickListener, ExoPlay
       case C.TYPE_OTHER:
         return new ExtractorMediaSource(uri, mediaDataSourceFactory, new DefaultExtractorsFactory(),
             mainHandler, eventLogger);
+      case C.TYPE_MEM_BUFFER:
+        return new ExtractorMediaSource(uri, buildMemoryBufferDataSourceFactory(uri), new DefaultExtractorsFactory(),
+                mainHandler, eventLogger);
       default: {
         throw new IllegalStateException("Unsupported type: " + type);
       }
@@ -395,6 +398,10 @@ public class PlayerActivity extends Activity implements OnClickListener, ExoPlay
   private DataSource.Factory buildDataSourceFactory(boolean useBandwidthMeter) {
     return ((DemoApplication) getApplication())
         .buildDataSourceFactory(useBandwidthMeter ? BANDWIDTH_METER : null);
+  }
+
+  private DataSource.Factory buildMemoryBufferDataSourceFactory(Uri uri) {
+    return new MemoryBufferDataSourceFactory(uri);
   }
 
   /**

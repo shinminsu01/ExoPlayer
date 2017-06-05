@@ -1,5 +1,14 @@
 [
   {
+    "name": "Memory Buffer Test",
+    "samples": [
+      {
+        "name": "Test Stream",
+        "uri": "/sdcard/Music/play.mp3"
+      }
+    ]
+  },
+  {
     "name": "YouTube DASH",
     "samples": [
       {

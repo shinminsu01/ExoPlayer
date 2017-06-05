@@ -315,6 +315,8 @@ public final class C {
    */
   public static final int TYPE_OTHER = 3;
 
+  public static final int TYPE_MEM_BUFFER = 4;
+
   /**
    * A return value for methods where the end of an input was encountered.
    */
